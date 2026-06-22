@@ -1,0 +1,20 @@
+{
+  "_comment": "Selection weights for batch composition. Default values = library prevalence (how often each format appears in the winning swipe file). The performance-feedback routine (see performance-loop.md) overwrites these with real Meta performance once ads are live, so the factory leans toward formats that actually convert. Higher = picked more often.",
+  "updated": "2026-06-22 (prevalence defaults)",
+  "source": "library prevalence",
+  "weights": {
+    "Bold Statement": 47,
+    "Plain Offer": 33,
+    "Stat Guarantee": 22,
+    "Fake UI": 22,
+    "Testimonial Result": 10,
+    "This vs That": 9,
+    "Framework Diagram": 9,
+    "Fake Social": 9,
+    "Listicle": 8,
+    "Before After": 5,
+    "Meme Native": 4,
+    "Lead Magnet Mockup": 3,
+    "Founder Human": 2
+  }
+}

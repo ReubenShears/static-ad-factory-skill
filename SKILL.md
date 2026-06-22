@@ -98,26 +98,31 @@ guidance are in `references/formats.md`.
    was given, pull the record from Baserow `Client Data` (table 1000911) and relevant context.
 
 2. **Plan the batch.** Decide the format × angle spread for `count` ads honouring parameters/defaults.
-   List the live templates in the `Static Ads` Drive folder
-   (`12pZLCEzziAAlYzbyH6OkmJKFKoE7Dsrg`) via Composio `GOOGLEDRIVE_FIND_FILE` — each filename is
-   `Category - angle - nn`, so you can filter/sample by category and angle directly. Pick specific
-   template files to carbon-copy (favour low text-density, clean structure). See `references/formats.md`.
+   Select templates from the bundled index `references/library-index.jsonl` (rich metadata + stable
+   Drive `id`): filter by requested formats/angles, prefer `text_density: low`, weight the format mix
+   using `references/format-weights.json`, and **dedup** against this client's prior `Source Templates`
+   in Baserow so repeat batches rotate. See `references/formats.md`.
 
-3. **Prep brand assets.** Fetch the client logo; if it's dark-on-transparent and will sit on a dark
+3. **Prep brand assets.** Fetch the client logo. Prefer logo-free templates; for logo-bearing ones see
+   `references/logo-templates.md`. If the logo is dark-on-transparent and will sit on a dark
    background, run `scripts/prep-logo.js` to make a light version.
 
 4. **Generate each ad (carbon-copy edit).** For each chosen template:
-   - Download it and **look at it** (Read the image) so you can describe its exact structure.
-   - Host the template on tmpfiles.org and run `OPENAI_CREATE_IMAGE_EDIT` (model `gpt-image-2`,
-     quality `medium`) with a "reproduce exactly, change only colours + words" prompt that specifies
-     the new copy per text block, the brand hexes, the colour rule, and "leave any logo area empty".
-   - Retrieve the base64 result, composite to 9:16 with `scripts/make916_extend.js`, and if the
-     template had a logo, overlay the real client logo with `scripts/overlay_logo.js`.
-   - **Generate in batches of ≤5 per Composio call** (larger calls time out).
+   - Download it (Composio Drive download → curl to local) and **look at it** so you can describe its
+     exact structure and exact copy.
+   - Write a `jobs.json` entry: `{id, template (local path), prompt, out, expect}` where `prompt` is
+     the carbon-copy prompt (reproduce exactly; change only colours + words; leave any logo area
+     empty) and `expect` lists the intended copy strings for QC.
+   - Run the **direct OpenAI generator**: `OPENAI_API_KEY=… node scripts/gen_batch.js jobs.json` — it
+     writes finished square PNGs to disk (no Composio/base64/tmpfiles, no timeout). *(Fallback for
+     envs without a key: the Composio `OPENAI_CREATE_IMAGE_EDIT` path in `references/pipeline.md` §3.)*
+   - Composite each to 9:16 with `scripts/make916_extend.js`; for logo templates overlay the real
+     client logo with `scripts/overlay_logo.js` (coords in `logo-templates.md`).
 
-5. **QC.** Build a contact sheet with `scripts/contact_sheet.js` and Read it. Check: correct/legible
-   copy, on-brand colours, semantic colours preserved, NO competitor logo or person, seamless 9:16.
-   Regenerate any miss before delivering.
+5. **QC (auto — regenerate misses).** Build a montage (`scripts/contact_sheet.js`), then Read each ad
+   and verify its `expect` strings render **correctly spelled**, brand colours applied, semantic
+   colours kept, NO competitor logo or person, seamless 9:16. Re-run `gen_batch.js` on a retry subset
+   for any miss (≤2 retries; else swap template). Only passing ads proceed. See `pipeline.md` §5.
 
 6. **Deliver to Drive.** Create a new subfolder under `Generated Ad Batches`
    (`1GfgqCopjp0ekFxpuStBGFVk7JQCsjY3c`) named `<Client> Batch NNN | <Offer>`. Upload the 9:16
@@ -125,8 +130,9 @@ guidance are in `references/formats.md`.
    `Static Ads` so generated work is never mistaken for source templates.
 
 7. **Log the batch.** Append one row to Baserow `Creative Batch Data` (table 1040349) — see field
-   list in `references/pipeline.md`. Report the Drive folder link, the format/angle spread, and flag
-   anything regenerated.
+   list in `references/pipeline.md`. Also append per-ad rows to `Creative Ad Data` if that table
+   exists (it's the join key for the performance loop — see `references/performance-loop.md`). Report
+   the Drive folder link, the format/angle spread, and flag anything regenerated.
 
 8. **Post to Slack** — channel `#5-asset-generation` (`C0AN653QCF2`) via the Slack MCP
    `slack_send_message`. Match the house style the demo/VSL skills use so the channel stays neat:
@@ -140,16 +146,28 @@ guidance are in `references/formats.md`.
   automatically** — they shouldn't have to ask twice.
 - When iterating with feedback, work in small rounds (e.g. 3 at a time) so a copy/colour miss costs
   one or two regenerations, never the whole set.
-- Keep the OpenAI spend efficient: `medium` quality (not `high` — it times out and costs more),
-  generate each ad once, and do all 9:16 framing locally (the scripts are free).
+- Keep the OpenAI spend efficient: `quality: medium`, generate each ad once, and do all 9:16 framing
+  locally (the scripts are free). With the direct API there's no 120s cap, so `high` is available for
+  hero ads if you want it.
+
+## Requirements
+
+- `OPENAI_API_KEY` in the env for the primary generator (`scripts/gen_batch.js`). Without it, fall
+  back to the Composio `openai` connection (slower, see `pipeline.md` §3).
+- Composio MCP (`googledrive` + `openai`), Baserow MCP, Slack MCP.
+- `node` + `sharp` (`npm i sharp`), `git`, `curl`.
 
 ## Reference files
 
-- `references/pipeline.md` — exact Composio tool slugs, the carbon-copy prompt pattern, the
-  edit→retrieve→composite→upload recipe with code, the Baserow field list, and all the gotchas
-  (no `input_fidelity`, batch ≤5, edit returns base64 so sync+decode, tmpfiles not catbox).
-- `references/formats.md` — the 13-format taxonomy, the angle list, how to pick templates from the
-  renamed library, and batch-composition guidance.
-- `scripts/` — `make916_extend.js` (1:1→9:16 seamless extend), `prep-logo.js` (dark→light logo),
-  `overlay_logo.js` (patch + composite real logo), `contact_sheet.js` (QC montage). All use Node +
-  `sharp` (`npm i sharp` if missing).
+- `references/pipeline.md` — exact recipe + code: direct-API generation (primary) and the Composio
+  fallback, the carbon-copy prompt pattern, compose/QC/upload, Baserow fields, Slack template, gotchas.
+- `references/formats.md` — the 13-format taxonomy, angle list, template selection + batch composition.
+- `references/library-index.jsonl` — rich per-template metadata (id, category, angle, layout, etc.)
+  for smart selection.
+- `references/format-weights.json` — selection weights (prevalence defaults; updated by the
+  performance loop).
+- `references/logo-templates.md` — logo handling + known logo-template coordinates.
+- `references/performance-loop.md` — how the factory learns from real Meta performance over time.
+- `scripts/` — `gen_batch.js` (direct OpenAI Images-edit batch generator), `make916_extend.js`
+  (1:1→9:16 seamless extend), `prep-logo.js` (dark→light logo), `overlay_logo.js` (patch + composite
+  real logo), `contact_sheet.js` (QC montage). Node + `sharp` (`npm i sharp`).

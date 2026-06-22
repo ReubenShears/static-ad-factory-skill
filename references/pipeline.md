@@ -16,6 +16,24 @@ Infra IDs:
 - Generated Ad Batches (output parent) folder: `1GfgqCopjp0ekFxpuStBGFVk7JQCsjY3c`
 - Baserow Creative Batch Data table: `1040349` (database `453125`); Client Data table: `1000911`
 
+## 0. Enrich from Client Data (graceful — never blocks)
+
+Before planning, look the client up in Baserow `Client Data` (table 1000911) to pull richer context.
+Match priority: `Client ID` (exact, uppercase) → `Company` (case-insensitive contains). Use the
+Baserow MCP `list_table_rows` with a `search` term, then confirm the right row.
+
+Useful fields to merge (skip blanks): `Industry`, `B2C/B2B`, `Company Size`, `Offer`,
+`Best Product/Service`, `Pricing`, `Guarantee`, `Elevator Pitch`, `Client-Written Summary`,
+`Market Advantage`, `ICP Examples`, `Consistent Client Persona`, `Pain Points`, `Main Bottleneck`,
+`Past Frustrations`, `Frequent Objections`, `FAQs`, `Main Goal`, `Case Studies`, `Extra Social Proof`,
+`Website URL`, `Socials`, `Drive/Dropbox` (may hold logo/photos/brand assets).
+
+Merge rules: the **user's brief wins on any conflict** (it's the campaign intent); Baserow fills gaps
+and adds richness (e.g. real pain wording, a concrete stat for a proof ad, the persona for tone). If
+**no row matches or the company can't be found, proceed with the provided context only** — log a one-
+line note ("no Client Data match; using provided context") and never block. Treat a client's own
+`Case Studies`/`Extra Social Proof` as usable proof in their own ads.
+
 ## 1. Pick + fetch templates
 
 **Select from the bundled index** `references/library-index.jsonl` (one row per library ad with

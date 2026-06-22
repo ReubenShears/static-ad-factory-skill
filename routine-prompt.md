@@ -20,8 +20,10 @@ without asking for confirmation mid-run. Report a summary at the end.
   - `style` = mixed (light + dark)
   - `offers` = single — if 2+ given, split the batch and label which ad sells which
 
-If only `client_code` is provided, pull the missing offer/ICP/brand context from Baserow
-`Client Data` (table 1000911) before proceeding.
+**Always enrich from `Client Data` (table 1000911)** before proceeding — match by `Client ID` (exact)
+then `Company` (contains), and merge the richer offer/ICP/pain/proof/asset fields. The brief wins on
+conflicts; Baserow fills gaps. If no row matches or the company can't be found, proceed with the
+provided context only (note it, don't block).
 
 ## Setup
 

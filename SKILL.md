@@ -30,8 +30,8 @@ text-to-image in favour of faithful reskins.
 
 ## Inputs
 
-**Required context** (from the user's brief, or pull from Baserow `Client Data` if only a Client ID
-is given):
+**Required context** (from the user's brief; the skill also auto-enriches from Baserow `Client Data`
+in step 1, so a bare company name/Client ID can be enough):
 - **Client ID / name** (e.g. `OPTIMALLY`) and **brand colours** (hex + which is primary vs accent).
 - **Campaign offer** — the *ad-level* offer being promoted (e.g. "free landing page"). This is the
   bait, often different from the backend/call offer.
@@ -94,8 +94,18 @@ Follow these steps. The detailed tool slugs, exact prompts, and gotchas are in
 `references/pipeline.md` — read it before generating. The format taxonomy and template-selection
 guidance are in `references/formats.md`.
 
-1. **Gather context.** Assemble client offer, ICP, pains, brand colours, logo. If only a Client ID
-   was given, pull the record from Baserow `Client Data` (table 1000911) and relevant context.
+1. **Gather context + enrich from Baserow.** Start from the user's brief, then **always try to enrich
+   from `Client Data` (table 1000911)** — even when a full brief was given, the record usually has
+   sharper offer/ICP/pain/proof detail. Match the referenced company by `Client ID` (exact, uppercase)
+   first, then `Company` (case-insensitive contains). If a row is found, pull and merge the useful
+   fields (Industry, Offer, Best Product/Service, Pricing, Guarantee, Elevator Pitch, Market Advantage,
+   ICP Examples, Consistent Client Persona, Pain Points, Main Bottleneck, Past Frustrations, Frequent
+   Objections, Case Studies, Extra Social Proof, Main Goal, Website URL, Drive/Dropbox for assets).
+   The user's brief always **wins on conflicts** (it's the campaign intent); Baserow fills gaps and
+   adds richness. **If no row matches (or the company can't be found), proceed silently with the
+   provided context only** — never block on a missing record. See `references/pipeline.md` for the
+   match query and field map. (Use a client's Case Studies / proof only for their own ads; that's
+   their results, fair game.)
 
 2. **Plan the batch.** Decide the format × angle spread for `count` ads honouring parameters/defaults.
    Select templates from the bundled index `references/library-index.jsonl` (rich metadata + stable

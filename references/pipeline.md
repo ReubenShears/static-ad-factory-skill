@@ -175,6 +175,42 @@ _<Client>_   `<CLIENT CODE>`
 > :white_check_mark:  _Status:_  Delivered  ·  Logged to Baserow
 ```
 
+## 9. Winner-variation lookup (variation mode)
+
+When the user references a prior winner, find it and vary it instead of generating fresh:
+1. `list_table_rows` on `Creative Batch Data` (1040349), filter to the client (search Client ID).
+   Read the relevant batch row(s): `Drive Folder`, `Formats Used`, `Source Templates`, notes.
+2. Open that Drive folder (`GOOGLEDRIVE_FIND_FILE folder_id=<batch folder>`) and, if a `Creative Ad
+   Data` table exists, its per-ad rows. Identify the winning ad from the user's description
+   (format/style/headline). **Download + view it** to lock its exact format, layout and copy.
+3. Find that ad's source template in `library-index.jsonl` (by the recorded Source Template or by
+   matching category) and generate `count` carbon-copy variations off it — keep the winning
+   format/layout/core message; vary only angle, headline phrasing, the highlighted line, sub-copy,
+   light/dark, minor accents. Note in the new batch row that it's variations of `<winner>`.
+
+## 10. Remote / restricted-egress compute (do the heavy lifting in the sandbox)
+
+In a remote routine env the **local sandbox often allowlists egress** — tmpfiles.org and the open web
+are blocked; only the Composio R2 download host is reachable. Detect it (tmpfiles uploads return empty,
+site fetches return ~119-byte error pages). When detected, run generation + composition on the
+**Composio remote sandbox** (`COMPOSIO_REMOTE_WORKBENCH`, a persistent Jupyter kernel with PIL +
+network), and only pull finished files back locally via Drive→R2 for the vision QC:
+
+1. In the workbench: get fresh template URLs (Drive download s3url) and call the image-edit tool there,
+   decoding `b64_json` to PNGs **in-sandbox** (never returns to your context).
+2. **Beat the ~60s MCP transport cap** by launching generation/compositing as **background threads**
+   in the kernel (the call returns immediately; threads keep running across calls). Poll a status dict
+   until done. Generate in small groups.
+3. Compose 9:16 in-sandbox with **PIL** (replicate `make916_extend`: resize square to 1080, then pad
+   to 1080x1920 by replicating the top/bottom edge rows so the background continues seamlessly).
+4. Create the Drive batch folder + upload finals from the sandbox (tmpfiles reachable there →
+   `GOOGLEDRIVE_UPLOAD_FROM_URL`).
+5. Pull the uploaded finals back **locally** via `GOOGLEDRIVE_DOWNLOAD_FILE` → R2 s3url → curl (this
+   path works even when local egress is otherwise blocked) and run the vision QC on them.
+
+This is exactly how the first remote batch (Disruptors) shipped. If `sharp` + open egress ARE
+available locally, the simpler local path (gen_batch.js + make916_extend.js) is fine.
+
 ## Gotchas (learned the hard way)
 
 The direct-API generator (section 2) avoids the worst of these (no base64/workbench/tmpfiles for gen,
@@ -185,7 +221,10 @@ no 120s cap). The first few bullets apply only to the **Composio fallback** (sec
   The direct API has no such cap, so `high` is fine there if you want it.
 - **(Composio fallback) Edit returns raw `b64_json`** (~300k tokens) — `sync_response_to_workbench:true`
   and decode via remote bash; never pull it inline. Batch **≤5 gens per multi-execute call**.
-- **(Composio fallback) remote sandbox is ephemeral per call** — decode + re-host in the same step.
+- **Sandbox persistence:** the `COMPOSIO_REMOTE_WORKBENCH` Jupyter kernel **persists across calls
+  within a run** (files + background threads survive) — use it for multi-step remote work (§10).
+  `COMPOSIO_REMOTE_BASH` calls can land on a fresh sandbox, so don't rely on bash-written files
+  persisting between separate bash calls — do decode + re-host in one step there.
 - **`GOOGLEDRIVE_UPLOAD_FROM_URL` fails from catbox.moe** (RemoteDisconnected). Use **tmpfiles.org**
   `/dl/` URLs for the upload hop. Upload in small batches.
 - **The read-only Google Drive connector** (`mcp__e3f11bdf...`) is download/search only — use Composio

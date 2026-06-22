@@ -13,6 +13,8 @@ without asking for confirmation mid-run. Report a summary at the end.
 - `brand_colours` — primary + accent hex (and which is which)
 - `logo_url` — OPTIONAL; needed to brand templates that contain a logo
 - `founder_photo_urls`, `case_studies` — OPTIONAL; for human-led or proof ads
+- `variation_of` — OPTIONAL; a reference to a prior winner ("the Apple-Notes one from batch 1"). If
+  present, run **winner-variation mode** (below) instead of a fresh batch.
 - Parameters (use the default if absent):
   - `count` = 10
   - `formats` = variation (weighted by library prevalence) — or a restricted list
@@ -20,10 +22,21 @@ without asking for confirmation mid-run. Report a summary at the end.
   - `style` = mixed (light + dark)
   - `offers` = single — if 2+ given, split the batch and label which ad sells which
 
-**Always enrich from `Client Data` (table 1000911)** before proceeding — match by `Client ID` (exact)
-then `Company` (contains), and merge the richer offer/ICP/pain/proof/asset fields. The brief wins on
-conflicts; Baserow fills gaps. If no row matches or the company can't be found, proceed with the
-provided context only (note it, don't block).
+**Be patient on inputs — don't rush to error.** The only hard-required input is which client this
+targets (`client_code`/company, or a `variation_of` reference). If it's missing at the start, it may
+just be arriving late (operator still wiring the trigger): **wait and re-check the input source a few
+times over ~5 min** (e.g. re-read after ~90s, up to 3 times) before doing anything. Only if still
+missing: send ONE concise heads-up by **DM to the routine owner** (not the public channel) and stop.
+Never guess a client. Other inputs (offer/ICP/brand) are not blockers.
+
+**Always enrich from `Client Data` (table 1000911)** once the client is known — match by `Client ID`
+(exact) then `Company` (contains), merge the richer offer/ICP/pain/proof/asset fields (brief wins on
+conflicts; Baserow fills gaps). If no row matches, proceed with the provided context (note it).
+
+**Winner-variation mode** (`variation_of` set): find the client's prior batch in `Creative Batch Data`
+→ open its Drive folder → identify + view the winning ad → generate `count` variations off that same
+format/template, varying only angle/headline/highlight/sub-copy/light-dark/minor accents. Don't go
+random — siblings of the winner. (See `SKILL.md` "Winner-variation mode".)
 
 ## Setup
 
@@ -33,7 +46,11 @@ provided context only (note it, don't block).
    exactly which one — do not attempt the batch.
 2. Pull the skill: `git clone --depth 1 https://github.com/ReubenShears/static-ad-factory-skill`.
    Read `SKILL.md`, `references/pipeline.md`, and `references/formats.md` fully before generating.
-3. Ensure Node + `sharp` are available in the repo dir (`npm i sharp` if missing).
+3. Ensure Node + `sharp` (`npm i sharp` if missing). Also probe egress: if tmpfiles/web are blocked
+   locally (uploads return empty, site fetches return tiny error pages), switch to the **remote-sandbox
+   path** — run image-edit + 9:16 composition (PIL) on `COMPOSIO_REMOTE_WORKBENCH` and pull finals back
+   via Drive→R2 for QC. Beat the ~60s transport cap with background threads + polling. Full recipe in
+   `SKILL.md` "Running remotely" + `pipeline.md` §10. (This is how the first remote batch shipped.)
 
 ## Execute
 

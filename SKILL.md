@@ -59,11 +59,29 @@ is that a bare "make ads for X" still produces a great, varied batch.
 | **style** | **mixed** (light + dark) | e.g. "all dark", "premium", "playful/meme". |
 | **offers** | **single** (the campaign offer) | If the user gives 2+ offers, split the batch across them and note which ad sells which. |
 | **aspect/output** | **9:16, content in centred 1:1 safe-zone** | Don't change unless asked. |
+| **variation_of** | — (off) | If the user references a prior *winner* (an ad/style/batch that worked), switch to **winner-variation mode** (below) — make variations of that winner, not a fresh random batch. |
 
 Compose the batch as a controlled grid over format × angle so adjacent ads differ by one dimension
 (smooth "linear" variation, not chaos). Weight toward the library's most common formats (Bold
 Statement, Plain Offer, Fake-UI, Stat/Guarantee) unless told otherwise. Confirm the plan back to the
 user in one line before generating if anything is ambiguous; otherwise just proceed.
+
+### Winner-variation mode (double down on what works)
+
+When the user points at something that already performed — "make more like the Apple-Notes one that
+crushed", "variations of batch 1's winner", "that this-vs-that ad worked, do 5 more like it" — do NOT
+spin a fresh diverse batch. The goal is *more shots on a proven target*, not novelty:
+
+1. **Find the winner.** Look up the client's prior batches in `Creative Batch Data` (filter by Client
+   ID), open the referenced batch's Drive folder (and `Creative Ad Data` rows if that table exists),
+   and identify the specific winning ad(s) from the user's description (format / style / headline).
+   **View the winning ad** to be certain of its exact format, layout and copy.
+2. **Vary only secondary levers.** Reuse the winner's format/template and core message; generate
+   `count` variations that change only: the angle, headline phrasing, the highlighted line, sub-copy,
+   light vs dark, and small visual accents. Stay close — a viewer should recognise them as siblings of
+   the winner. (If the user also names a new offer, swap the offer but keep the winning format/style.)
+3. **Log it as a variation set** — note in the batch row's Feedback/Notes that it's variations of
+   `<winner>` so the lineage is clear. See `references/pipeline.md` for the lookup recipe.
 
 ## The hard rules (do not violate)
 
@@ -94,6 +112,16 @@ Follow these steps. The detailed tool slugs, exact prompts, and gotchas are in
 `references/pipeline.md` — read it before generating. The format taxonomy and template-selection
 guidance are in `references/formats.md`.
 
+0. **Be patient on inputs — don't rush to an error.** The one truly required input is which client
+   this run targets (a `client_code`/company, or a winner reference for variation mode). If it's
+   missing at the start, context sometimes just lands late (the operator may still be wiring the
+   trigger). **Wait and re-check the input source a few times over a short grace window** (e.g.
+   re-read after ~90s, up to ~3 times / ~5 min total) before doing anything else. Only if it's still
+   missing after the grace window: send ONE concise heads-up — **DM the routine owner** (not the
+   public `#5-asset-generation` channel) — and stop. Never guess which client to spend image-gen
+   budget on, and never ship a public Slack post / Drive folder / Baserow row for a guess. (Other
+   inputs — offer/ICP/brand — are not blockers: enrich from Baserow, then proceed with what you have.)
+
 1. **Gather context + enrich from Baserow.** Start from the user's brief, then **always try to enrich
    from `Client Data` (table 1000911)** — even when a full brief was given, the record usually has
    sharper offer/ICP/pain/proof detail. Match the referenced company by `Client ID` (exact, uppercase)
@@ -113,9 +141,12 @@ guidance are in `references/formats.md`.
    using `references/format-weights.json`, and **dedup** against this client's prior `Source Templates`
    in Baserow so repeat batches rotate. See `references/formats.md`.
 
-3. **Prep brand assets.** Fetch the client logo. Prefer logo-free templates; for logo-bearing ones see
-   `references/logo-templates.md`. If the logo is dark-on-transparent and will sit on a dark
-   background, run `scripts/prep-logo.js` to make a light version.
+3. **Prep brand assets.** Establish brand colours + logo. `Client Data` has no dedicated brand-colour
+   field today, so if the brief and Baserow don't give them, **derive them from the client's website**
+   (primary + accent hex). If local network egress is restricted (see "Running remotely"), fetch the
+   site from the remote sandbox or a web tool. **Prefer logo-free templates** so a missing/blocked
+   logo never blocks the run; for logo-bearing ones see `references/logo-templates.md` (and
+   `scripts/prep-logo.js` for a light version on dark backgrounds).
 
 4. **Generate each ad (carbon-copy edit).** For each chosen template:
    - Download it (Composio Drive download → curl to local) and **look at it** so you can describe its
@@ -166,6 +197,26 @@ guidance are in `references/formats.md`.
   back to the Composio `openai` connection (slower, see `pipeline.md` §3).
 - Composio MCP (`googledrive` + `openai`), Baserow MCP, Slack MCP.
 - `node` + `sharp` (`npm i sharp`), `git`, `curl`.
+
+## Running remotely (restricted environments)
+
+Validated end-to-end in a remote routine env. Expect these and adapt — they're normal, not failures:
+
+- **No `OPENAI_API_KEY`** → use the Composio `OPENAI_CREATE_IMAGE_EDIT` fallback (`pipeline.md` §3).
+  This is the default remote path.
+- **`sharp` not preinstalled** → `npm i sharp`, OR composite with PIL on the remote sandbox (below).
+- **Restricted local egress** — the local sandbox may allowlist network so **tmpfiles.org and the open
+  web are blocked** (only the Composio R2 download host is reachable). When you detect this (uploads
+  return empty / fetches return tiny error pages), do hosting + image-edit + 9:16 composition on the
+  **Composio remote sandbox** (`COMPOSIO_REMOTE_WORKBENCH`, which has PIL and reaches tmpfiles), keep
+  the base64 in-sandbox (never in your context), then pull finished files back locally via the
+  Drive→R2 download path for the vision QC. Recipe in `pipeline.md`.
+- **~60s MCP transport cap** — long sandbox cells get cut at ~60s even though the kernel keeps running.
+  Submit generation/compositing as **background threads in the workbench kernel** (returns instantly,
+  threads persist across calls) and poll for completion. Work in small groups.
+- **Brand/logo not in Baserow** — derive from the client website (from the sandbox if egress is
+  blocked); prefer logo-free templates so it never blocks.
+- **Be patient on inputs** — see step 0 (grace window before erroring).
 
 ## Reference files
 

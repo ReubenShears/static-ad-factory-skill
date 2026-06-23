@@ -141,12 +141,25 @@ guidance are in `references/formats.md`.
    using `references/format-weights.json`, and **dedup** against this client's prior `Source Templates`
    in Baserow so repeat batches rotate. See `references/formats.md`.
 
-3. **Prep brand assets.** Establish brand colours + logo. `Client Data` has no dedicated brand-colour
-   field today, so if the brief and Baserow don't give them, **derive them from the client's website**
-   (primary + accent hex). If local network egress is restricted (see "Running remotely"), fetch the
-   site from the remote sandbox or a web tool. **Prefer logo-free templates** so a missing/blocked
-   logo never blocks the run; for logo-bearing ones see `references/logo-templates.md` (and
-   `scripts/prep-logo.js` for a light version on dark backgrounds).
+3. **Resolve brand via Firecrawl (the consistent, egress-independent way).** Don't guess or hand-pick
+   brand colours — scrape them, the same way the demo skill does:
+   - **Find the website.** Use Client Data `Website URL`; if blank, derive the domain from the
+     client's email (`Contact Email` → `Payment Email` → `Organizer Email(s)`), skipping generic
+     providers (gmail/outlook/yahoo/icloud/hotmail/proton). If there's no site and only a generic
+     email, fall back to brand colours from the brief (or the `optimally-brand-assets` defaults when
+     the client is Optimally).
+   - **Scrape once:** `firecrawl_scrape(url, formats: ["branding"])`. Returns `branding.colors`
+     (primary / secondary / textPrimary / background), `branding.colorScheme` (light/dark), and
+     `branding.images.logo` / `favicon`. **Use Firecrawl, not a direct site fetch** — it scrapes
+     server-side, so it works even when the sandbox's egress is blocked (a direct fetch returns
+     error pages there).
+   - **Map it:** primary → brand primary, secondary → accent; `colorScheme` + `background` bias the
+     light/dark style mix; `images.logo` → the client logo (download for overlay on logo-bearing
+     templates). **Monochrome sanity check** (from the demo skill): if the brand reads black/white/grey,
+     keep it mono and use near-white for accents — never invent a colour.
+   - **Logo:** prefer logo-free templates so a missing logo never blocks; for logo-bearing ones use the
+     scraped logo via `references/logo-templates.md` (+ `scripts/prep-logo.js` for a light version on
+     dark backgrounds). Requires the **Firecrawl MCP**.
 
 4. **Generate each ad (carbon-copy edit).** For each chosen template:
    - Download it (Composio Drive download → curl to local) and **look at it** so you can describe its
@@ -195,7 +208,7 @@ guidance are in `references/formats.md`.
 
 - `OPENAI_API_KEY` in the env for the primary generator (`scripts/gen_batch.js`). Without it, fall
   back to the Composio `openai` connection (slower, see `pipeline.md` §3).
-- Composio MCP (`googledrive` + `openai`), Baserow MCP, Slack MCP.
+- Composio MCP (`googledrive` + `openai`), Baserow MCP, Slack MCP, **Firecrawl MCP** (brand scrape).
 - `node` + `sharp` (`npm i sharp`), `git`, `curl`.
 
 ## Running remotely (restricted environments)

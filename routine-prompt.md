@@ -41,9 +41,9 @@ random — siblings of the winner. (See `SKILL.md` "Winner-variation mode".)
 ## Setup
 
 1. Confirm prerequisites: `OPENAI_API_KEY` in the env (for the primary generator; if absent, use the
-   Composio `openai` fallback), the MCP connections Composio (`googledrive` + `openai`), Baserow and
-   Slack, and `node` + `sharp` + `git` + `curl`. If a required connection is missing, stop and report
-   exactly which one — do not attempt the batch.
+   Composio `openai` fallback), the MCP connections Composio (`googledrive` + `openai`), Baserow,
+   Slack and **Firecrawl** (brand scrape), and `node` + `sharp` + `git` + `curl`. If a required
+   connection is missing, stop and report exactly which one — do not attempt the batch.
 2. Pull the skill: `git clone --depth 1 https://github.com/ReubenShears/static-ad-factory-skill`.
    Read `SKILL.md`, `references/pipeline.md`, and `references/formats.md` fully before generating.
 3. Ensure Node + `sharp` (`npm i sharp` if missing). Also probe egress: if tmpfiles/web are blocked
@@ -56,8 +56,11 @@ random — siblings of the winner. (See `SKILL.md` "Winner-variation mode".)
 
 Follow `SKILL.md` exactly. In summary:
 
-1. Assemble the client context. Decide the format × angle spread for `count` ads honouring the
-   parameters/defaults (controlled variation; weight toward common winning formats).
+1. Assemble the client context. **Resolve brand by Firecrawl:** find the website (Client Data
+   `Website URL`, else derive the domain from the client's email, skipping generic providers), then
+   `firecrawl_scrape(url, formats:["branding"])` for colours + logo + colorScheme (server-side, so it
+   works under restricted egress). Map primary→brand, secondary→accent; monochrome check applies. Then
+   decide the format × angle spread for `count` ads honouring the parameters/defaults.
 2. List the `Static Ads` library folder and pick specific templates (filenames are
    `Category - angle - nn`). Download + view each chosen template so you can describe its exact
    structure.

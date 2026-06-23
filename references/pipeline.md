@@ -34,6 +34,25 @@ and adds richness (e.g. real pain wording, a concrete stat for a proof ad, the p
 line note ("no Client Data match; using provided context") and never block. Treat a client's own
 `Case Studies`/`Extra Social Proof` as usable proof in their own ads.
 
+## 0b. Resolve brand (Firecrawl — same as the demo skill)
+
+Source brand colours + logo by scraping, not guessing:
+1. **Website:** Client Data `Website URL`. If blank, derive the domain from the client's email
+   (`Contact Email` → `Payment Email` → `Organizer Email(s)`), skipping generic providers
+   (gmail/outlook/yahoo/icloud/hotmail/proton). No site + only generic email → use brief colours /
+   Optimally defaults and move on.
+2. **One Firecrawl call:** `firecrawl_scrape(url, formats: ["branding"])`. Returns:
+   - `branding.colors`: `primary`, `secondary`, `textPrimary`, `background`
+   - `branding.colorScheme`: `light` | `dark`
+   - `branding.images`: `logo`, `favicon`, `ogImage`
+   - `branding.fonts`, `branding.spacing.borderRadius`
+   Firecrawl scrapes **server-side**, so this works under restricted local egress (unlike a direct
+   `curl` of the site, which returns error pages there). Prefer it everywhere.
+3. **Map:** primary→brand primary, secondary→accent; `colorScheme`+`background`→bias light/dark style
+   mix; `images.logo`→client logo (download for overlay). **Monochrome check:** if the palette reads
+   black/white/grey (or `primary` is a stray clashing colour), keep it mono + near-white accents — do
+   not invent a colour. Feed the resolved hexes into every carbon-copy prompt's colour instructions.
+
 ## 1. Pick + fetch templates
 
 **Select from the bundled index** `references/library-index.jsonl` (one row per library ad with

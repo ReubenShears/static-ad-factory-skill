@@ -188,28 +188,41 @@ When the user references a prior winner, find it and vary it instead of generati
    format/layout/core message; vary only angle, headline phrasing, the highlighted line, sub-copy,
    light/dark, minor accents. Note in the new batch row that it's variations of `<winner>`.
 
-## 10. Remote / restricted-egress compute (do the heavy lifting in the sandbox)
+## 10. Remote / restricted-egress compute (resumable + throttled — DON'T burn credits)
 
-In a remote routine env the **local sandbox often allowlists egress** — tmpfiles.org and the open web
-are blocked; only the Composio R2 download host is reachable. Detect it (tmpfiles uploads return empty,
-site fetches return ~119-byte error pages). When detected, run generation + composition on the
-**Composio remote sandbox** (`COMPOSIO_REMOTE_WORKBENCH`, a persistent Jupyter kernel with PIL +
-network), and only pull finished files back locally via Drive→R2 for the vision QC:
+If `OPENAI_API_KEY` + open egress are available, just use the local path (`gen_batch.js` is already
+resumable + rate-limit-safe) — done. Otherwise (no key, restricted egress: tmpfiles/web blocked, only
+the Composio R2 download host reachable — detect via empty tmpfiles uploads / ~119-byte fetches), do
+the work on the **Composio remote sandbox** (`COMPOSIO_REMOTE_WORKBENCH`, a Jupyter kernel with PIL +
+network). The first naive version of this wasted a lot of credits; follow these rules so a crash or
+rate-limit never causes a re-spend:
 
-1. In the workbench: get fresh template URLs (Drive download s3url) and call the image-edit tool there,
-   decoding `b64_json` to PNGs **in-sandbox** (never returns to your context).
-2. **Beat the ~60s MCP transport cap** by launching generation/compositing as **background threads**
-   in the kernel (the call returns immediately; threads keep running across calls). Poll a status dict
-   until done. Generate in small groups.
-3. Compose 9:16 in-sandbox with **PIL** (replicate `make916_extend`: resize square to 1080, then pad
-   to 1080x1920 by replicating the top/bottom edge rows so the background continues seamlessly).
-4. Create the Drive batch folder + upload finals from the sandbox (tmpfiles reachable there →
-   `GOOGLEDRIVE_UPLOAD_FROM_URL`).
-5. Pull the uploaded finals back **locally** via `GOOGLEDRIVE_DOWNLOAD_FILE` → R2 s3url → curl (this
-   path works even when local egress is otherwise blocked) and run the vision QC on them.
+**The 5 anti-waste rules (non-negotiable):**
+1. **Create the Drive batch folder FIRST**, then make it the durable store. Per ad, do
+   generate → compose 9:16 → **upload to Drive immediately**. Never hold a finished ad only in the
+   sandbox — `/mnt/files` does **not** reliably survive a kernel recycle (it wiped 12 squares once).
+2. **Resume by listing the Drive folder.** Before generating any slot, list the batch folder
+   (`GOOGLEDRIVE_FIND_FILE`) and **skip slots already uploaded** (match by the `NN - <Format>` name).
+   So re-running after a recycle only generates what's missing — you never re-pay for a finished ad.
+3. **Concurrency ≤ 3.** OpenAI image edits 429 fast; launching 10+ at once guarantees rate-limit
+   retries (= wasted calls). Run a small worker pool (3), not "all at once".
+4. **Back off on 429/5xx** (2s,4s,8s,16s,32s,60s), up to ~6 attempts per ad. Don't hammer.
+5. **Safe filenames for the tmpfiles hop** — tmpfiles 422s on single-char names like `a.png`; use a
+   descriptive multi-char name (e.g. `ad-<id>.png`).
 
-This is exactly how the first remote batch (Disruptors) shipped. If `sharp` + open egress ARE
-available locally, the simpler local path (gen_batch.js + make916_extend.js) is fine.
+**Mechanics:**
+- Beat the ~60s MCP transport cap by running the driver as a **background thread** in the kernel
+  (returns instantly; thread persists across calls) and poll a status dict. But correctness comes from
+  rules 1–2 (Drive = source of truth + resume), NOT from the kernel staying alive.
+- Get fresh template URLs (Drive download s3url) and pass them straight as the edit `image_url`; decode
+  `b64_json` → PNG **in-sandbox** (never into your context).
+- Compose 9:16 with **PIL** (replicate `make916_extend`: resize square to 1080, then extend to
+  1080x1920 by replicating the top/bottom edge rows).
+- After all slots are in Drive, pull them back **locally** via `GOOGLEDRIVE_DOWNLOAD_FILE` → R2 → curl
+  for the vision QC.
+
+Net: at most one paid generation per ad even across crashes/rate-limits, because Drive is the
+checkpoint and every run resumes from it.
 
 ## Gotchas (learned the hard way)
 

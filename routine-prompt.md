@@ -86,9 +86,13 @@ centred 1:1 safe-zone; legible correct spelling.
 
 ## Efficiency
 
-Use `quality: medium` (not `high` — it times out and costs more), generate each ad once, and do all
-9:16 framing/logo work locally with the bundled scripts (free). Batch ≤5 image gens per Composio
-call.
+Use `quality: medium`. **Generate each ad at most once, even across crashes/rate-limits** — this is
+the credit-safety rule the first remote run violated. So: create the Drive batch folder first; per ad
+generate → compose → **upload to Drive immediately**; **resume by listing the folder and skipping
+slots already uploaded**; keep **concurrency ≤ 3**; back off on 429/5xx; don't trust `/mnt/files` to
+survive a recycle. Drive is the checkpoint. Full recipe in `pipeline.md` §10. Do 9:16 framing with the
+bundled scripts (free). **Best fix: if the env has `OPENAI_API_KEY` + `api.openai.com` allowlisted,
+use `gen_batch.js` (already resumable + 429-safe) and skip the sandbox path entirely.**
 
 ## Report (at the end)
 

@@ -207,16 +207,24 @@ Validated end-to-end in a remote routine env. Expect these and adapt — they're
 - **`sharp` not preinstalled** → `npm i sharp`, OR composite with PIL on the remote sandbox (below).
 - **Restricted local egress** — the local sandbox may allowlist network so **tmpfiles.org and the open
   web are blocked** (only the Composio R2 download host is reachable). When you detect this (uploads
-  return empty / fetches return tiny error pages), do hosting + image-edit + 9:16 composition on the
-  **Composio remote sandbox** (`COMPOSIO_REMOTE_WORKBENCH`, which has PIL and reaches tmpfiles), keep
-  the base64 in-sandbox (never in your context), then pull finished files back locally via the
-  Drive→R2 download path for the vision QC. Recipe in `pipeline.md`.
-- **~60s MCP transport cap** — long sandbox cells get cut at ~60s even though the kernel keeps running.
-  Submit generation/compositing as **background threads in the workbench kernel** (returns instantly,
-  threads persist across calls) and poll for completion. Work in small groups.
+  return empty / fetches return tiny error pages), do image-edit + 9:16 composition on the **Composio
+  remote sandbox** (`COMPOSIO_REMOTE_WORKBENCH`, PIL + network), keep base64 in-sandbox, then pull
+  finals back locally via Drive→R2 for QC.
+- **Generate resumably + throttled — this is the credit-safety rule.** A naive remote run wasted
+  credits (a sandbox recycle wiped 12 in-progress squares → full regen; 429s from launching 14 at
+  once). So ALWAYS: create the Drive batch folder first; per ad **generate → compose → upload to Drive
+  immediately**; **resume by listing the folder and skipping slots already uploaded**; cap
+  **concurrency ≤ 3**; back off on 429/5xx. Drive is the checkpoint, so a crash or rate-limit costs at
+  most the in-flight ad, never the whole batch. Don't trust `/mnt/files` to survive a recycle. Full
+  recipe + rules in `pipeline.md` §10. (Beat the ~60s transport cap by running the driver as a
+  background thread + polling — but correctness comes from the Drive-resume rule, not kernel uptime.)
 - **Brand/logo not in Baserow** — derive from the client website (from the sandbox if egress is
   blocked); prefer logo-free templates so it never blocks.
 - **Be patient on inputs** — see step 0 (grace window before erroring).
+- **Best fix (recommended for the routine env): set `OPENAI_API_KEY` and allowlist `api.openai.com`.**
+  Then the local `gen_batch.js` path runs — it's resumable + 429-safe + writes to disk — and the whole
+  fragile remote-sandbox/tmpfiles dance (the source of the wasted credits) disappears. Until that's
+  provisioned, the resumable §10 sandbox path is the safe fallback.
 
 ## Reference files
 
